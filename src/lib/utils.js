@@ -1,4 +1,3 @@
-// Format numbers (1000 -> 1K, 1000000 -> 1M)
 export function formatCount(num) {
   if (!num) return '0'
   if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B'
@@ -7,7 +6,6 @@ export function formatCount(num) {
   return num.toString()
 }
 
-// Get platform from URL
 export function detectPlatform(url) {
   if (!url) return 'other'
   const lower = url.toLowerCase()
@@ -19,7 +17,6 @@ export function detectPlatform(url) {
   return 'other'
 }
 
-// Platform colors
 export function getPlatformColor(platform) {
   const colors = {
     instagram: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)',
@@ -32,7 +29,6 @@ export function getPlatformColor(platform) {
   return colors[platform] || colors.other
 }
 
-// Platform display name
 export function getPlatformName(platform) {
   const names = {
     instagram: 'Instagram',
@@ -45,7 +41,18 @@ export function getPlatformName(platform) {
   return names[platform] || 'Link'
 }
 
-// Time ago
+export function getPlatformIcon(platform) {
+  const icons = {
+    instagram: '📸',
+    tiktok: '🎵',
+    youtube: '▶️',
+    twitter: '🐦',
+    facebook: '👍',
+    other: '🔗'
+  }
+  return icons[platform] || '🔗'
+}
+
 export function timeAgo(date) {
   if (!date) return ''
   const now = new Date()
@@ -59,7 +66,6 @@ export function timeAgo(date) {
   return Math.floor(diff / 2592000) + 'mo'
 }
 
-// Get avatar initials
 export function getInitials(name) {
   if (!name) return 'U'
   const parts = name.split(' ')
@@ -67,7 +73,6 @@ export function getInitials(name) {
   return name[0].toUpperCase()
 }
 
-// Calculate live viewers based on followers
 export function calcLiveViewers(followers) {
   if (followers >= 10000000) return Math.floor(Math.random() * 500000) + 500000
   if (followers >= 1000000) return Math.floor(Math.random() * 150000) + 50000
@@ -77,21 +82,14 @@ export function calcLiveViewers(followers) {
   return Math.floor(Math.random() * 20) + 1
 }
 
-// Simulate engagement growth
 export function calcEngagement(followers, type = 'likes') {
-  const base = {
-    likes: 0.05,
-    comments: 0.01,
-    shares: 0.005,
-    views: 0.15
-  }
+  const base = { likes: 0.05, comments: 0.01, shares: 0.005, views: 0.15 }
   const rate = base[type] || 0.05
   const engagement = Math.floor(followers * rate)
   const variance = Math.floor(engagement * 0.3)
   return engagement + Math.floor(Math.random() * variance * 2) - variance
 }
 
-// Get verification badge info
 export function getVerificationBadge(user) {
   if (!user?.is_verified) return null
   const color = user.verification_color || 'blue'
@@ -106,33 +104,25 @@ export function getVerificationBadge(user) {
   return { color: colors[color] || colors.blue, label: color }
 }
 
-// Fetch link metadata (thumbnail + title)
+// Fetch real thumbnails using open graph / proxy services
 export async function fetchLinkMeta(url) {
   const platform = detectPlatform(url)
-  
-  // Generate thumbnail based on platform
-  const thumbnails = {
-    instagram: `https://og.binnelson.com/api/og?url=${encodeURIComponent(url)}`,
-    tiktok: null,
-    youtube: getYoutubeThumbnail(url),
-    twitter: null,
-    facebook: null,
-    other: null
+
+  let thumbnail_url = ''
+
+  if (platform === 'youtube') {
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+    if (match) thumbnail_url = `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
+  } else {
+    // Use a CORS-friendly OG image proxy for all platforms
+    thumbnail_url = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url`
   }
 
   return {
     platform,
-    thumbnail_url: thumbnails[platform] || '',
+    thumbnail_url,
     title: `${getPlatformName(platform)} Post`
   }
-}
-
-function getYoutubeThumbnail(url) {
-  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
-  if (match) {
-    return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
-  }
-  return ''
 }
 
 export function generateDeviceFingerprint() {

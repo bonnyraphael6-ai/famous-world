@@ -1,173 +1,150 @@
 import React, { useState, useContext } from 'react'
-import { ArrowLeft, Shield, HelpCircle, FileText, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Camera, Upload } from 'lucide-react'
 import { UserContext } from '../App'
-import Avatar from '../components/Avatar'
 import supabase from '../lib/supabase'
-import { refreshCurrentUser } from '../lib/auth'
+
+const CATEGORIES = [
+  'Public Figure', 'Actor / Actress', 'Musician / Artist', 'Comedian',
+  'Athlete / Sports', 'Influencer', 'Content Creator', 'Entrepreneur',
+  'Model', 'Politician', 'Journalist', 'Activist', 'Gamer', 'Chef / Food',
+  'Fashion Designer', 'Photographer', 'Filmmaker', 'Author / Writer', 'Other'
+]
 
 export default function SettingsPage() {
   const { currentUser, setCurrentUser } = useContext(UserContext)
   const navigate = useNavigate()
-  const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
     full_name: currentUser?.full_name || '',
     bio: currentUser?.bio || '',
-    avatar_url: currentUser?.avatar_url || ''
+    avatar_url: currentUser?.avatar_url || '',
+    category: currentUser?.category || '',
   })
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  const [section, setSection] = useState('main')
+  const [saved, setSaved] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
-  const saveProfile = async () => {
+  const handleSave = async () => {
     setSaving(true)
-    const { error } = await supabase.from('users').update({
-      full_name: form.full_name,
-      bio: form.bio,
-      avatar_url: form.avatar_url
-    }).eq('id', currentUser.id)
-
-    if (!error) {
-      const refreshed = await refreshCurrentUser()
-      if (refreshed) setCurrentUser(refreshed)
-      setMessage('Profile updated!')
-      setEditing(false)
+    const { data } = await supabase.from('users').update(form).eq('id', currentUser.id).select().single()
+    if (data) {
+      setCurrentUser(data)
+      localStorage.setItem('fw_user', JSON.stringify(data))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
     }
     setSaving(false)
-    setTimeout(() => setMessage(''), 3000)
   }
 
-  const requestVerification = async () => {
-    const { error } = await supabase.from('verification_requests').insert({
-      user_id: currentUser.id,
-      status: 'pending',
-      badge_color: 'blue'
-    })
-    if (!error) setMessage('Verification request submitted! We will review it soon.')
-    setTimeout(() => setMessage(''), 4000)
-  }
-
-  if (section === 'terms') {
-    return (
-      <div className="page">
-        <div className="header">
-          <ArrowLeft size={24} style={{ cursor: 'pointer' }} onClick={() => setSection('main')} />
-          <span style={{ fontWeight: 700 }}>Terms & Conditions</span>
-          <div />
-        </div>
-        <div style={{ padding: 20, fontSize: 14, color: 'var(--text-2)', lineHeight: 1.8 }}>
-          <h2 style={{ marginBottom: 16 }}>Famous World Terms of Service</h2>
-          <p><strong>1. Acceptance:</strong> By using Famous World, you agree to these terms.</p>
-          <p style={{ marginTop: 12 }}><strong>2. Content:</strong> You are responsible for all content you post. Only share content you have rights to.</p>
-          <p style={{ marginTop: 12 }}><strong>3. Prohibited:</strong> No spam, hate speech, adult content, or illegal activities.</p>
-          <p style={{ marginTop: 12 }}><strong>4. Famous Coins:</strong> Coins are earned through engagement and are non-transferable.</p>
-          <p style={{ marginTop: 12 }}><strong>5. Multiple Accounts:</strong> One account per person. Multiple accounts may be suspended.</p>
-          <p style={{ marginTop: 12 }}><strong>6. Verification:</strong> Verification is at Famous World's discretion and can be revoked.</p>
-          <p style={{ marginTop: 12 }}><strong>7. Termination:</strong> We reserve the right to suspend accounts that violate these terms.</p>
-          <p style={{ marginTop: 20, color: 'var(--text-3)' }}>Last updated: January 2025</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (section === 'privacy') {
-    return (
-      <div className="page">
-        <div className="header">
-          <ArrowLeft size={24} style={{ cursor: 'pointer' }} onClick={() => setSection('main')} />
-          <span style={{ fontWeight: 700 }}>Privacy Policy</span>
-          <div />
-        </div>
-        <div style={{ padding: 20, fontSize: 14, color: 'var(--text-2)', lineHeight: 1.8 }}>
-          <h2 style={{ marginBottom: 16 }}>Privacy Policy</h2>
-          <p><strong>Data We Collect:</strong> Username, email/phone, country, and content you post.</p>
-          <p style={{ marginTop: 12 }}><strong>How We Use It:</strong> To provide and improve Famous World services.</p>
-          <p style={{ marginTop: 12 }}><strong>Data Security:</strong> Your data is stored securely and never sold to third parties.</p>
-          <p style={{ marginTop: 12 }}><strong>Your Rights:</strong> You can delete your account at any time.</p>
-          <p style={{ marginTop: 20, color: 'var(--text-3)' }}>Last updated: January 2025</p>
-        </div>
-      </div>
-    )
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `avatars/${currentUser.id}.${ext}`
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+        setForm(f => ({ ...f, avatar_url: publicUrl }))
+        await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', currentUser.id)
+        setCurrentUser(u => ({ ...u, avatar_url: publicUrl }))
+      }
+    } catch (err) {
+      // Fallback if storage not set up
+      console.error('Avatar upload error:', err)
+    }
+    setUploadingAvatar(false)
   }
 
   return (
     <div className="page">
       <div className="header">
         <ArrowLeft size={24} style={{ cursor: 'pointer' }} onClick={() => navigate(-1)} />
-        <span style={{ fontWeight: 700 }}>Settings</span>
-        <div />
+        <span style={{ fontWeight: 700, fontSize: 17 }}>Settings</span>
+        <div style={{ width: 24 }} />
       </div>
 
-      {message && (
-        <div style={{ 
-          margin: 16, padding: 12, background: 'rgba(0,200,81,0.1)', 
-          border: '1px solid rgba(0,200,81,0.3)', borderRadius: 10, 
-          color: 'var(--green)', fontSize: 14 
-        }}>
-          {message}
+      <div style={{ padding: 16 }}>
+        {/* Avatar upload */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ position: 'relative', marginBottom: 8 }}>
+            <div style={{
+              width: 90, height: 90, borderRadius: '50%',
+              background: form.avatar_url ? 'transparent' : 'var(--primary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 32, fontWeight: 700, color: 'white',
+              overflow: 'hidden', border: '3px solid var(--primary)'
+            }}>
+              {form.avatar_url ? (
+                <img src={form.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (currentUser?.full_name || currentUser?.username || 'U')[0].toUpperCase()}
+            </div>
+            <label style={{
+              position: 'absolute', bottom: 0, right: 0,
+              background: 'var(--primary)', borderRadius: '50%', width: 28, height: 28,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+            }}>
+              {uploadingAvatar ? <div className="spinner" style={{ width: 14, height: 14 }} /> : <Camera size={14} color="white" />}
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
+            </label>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-3)' }}>Tap camera to change photo</p>
         </div>
-      )}
 
-      {/* Profile Section */}
-      <div style={{ padding: 16, borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-          <Avatar user={currentUser} size={64} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{currentUser?.full_name || currentUser?.username}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-3)' }}>@{currentUser?.username}</div>
-          </div>
+        {/* Or paste URL */}
+        <div className="form-group">
+          <label className="form-label">Or paste image URL</label>
+          <input className="form-input" placeholder="https://..." value={form.avatar_url}
+            onChange={e => setForm(f => ({ ...f, avatar_url: e.target.value }))} />
         </div>
 
-        {editing ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6, display: 'block', fontWeight: 600 }}>Display Name</label>
-              <input className="input" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6, display: 'block', fontWeight: 600 }}>Bio</label>
-              <textarea className="input" style={{ height: 80, resize: 'none' }} value={form.bio}
-                onChange={e => setForm(p => ({ ...p, bio: e.target.value }))} maxLength={150} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6, display: 'block', fontWeight: 600 }}>Avatar URL</label>
-              <input className="input" placeholder="https://..." value={form.avatar_url}
-                onChange={e => setForm(p => ({ ...p, avatar_url: e.target.value }))} />
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setEditing(false)}>Cancel</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={saveProfile} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button className="btn btn-outline btn-block" onClick={() => setEditing(true)}>Edit Profile</button>
-        )}
-      </div>
+        <div className="form-group">
+          <label className="form-label">Full Name / Stage Name</label>
+          <input className="form-input" placeholder="Your name" value={form.full_name}
+            onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
+        </div>
 
-      {/* Options */}
-      <div>
-        {[
-          { icon: Shield, label: 'Request Verification Badge', action: requestVerification },
-          { icon: HelpCircle, label: 'Help & Support', action: () => navigate('/profile/famousworldsupport') },
-          { icon: FileText, label: 'Terms & Conditions', action: () => setSection('terms') },
-          { icon: FileText, label: 'Privacy Policy', action: () => setSection('privacy') },
-        ].map(({ icon: Icon, label, action }) => (
-          <div key={label} style={{
-            display: 'flex', alignItems: 'center', gap: 14,
-            padding: '16px', borderBottom: '1px solid var(--border)',
-            cursor: 'pointer'
-          }} onClick={action}>
-            <Icon size={20} color="var(--text-3)" />
-            <span style={{ flex: 1, fontSize: 15 }}>{label}</span>
-            <ChevronRight size={16} color="var(--text-3)" />
-          </div>
-        ))}
-      </div>
+        <div className="form-group">
+          <label className="form-label">Category</label>
+          <select className="form-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+            <option value="">Select your category</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
 
-      <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-3)', fontSize: 12 }}>
-        Famous World v1.0 • Made with ❤️
+        <div className="form-group">
+          <label className="form-label">Bio</label>
+          <textarea className="form-input" rows={3} placeholder="Tell the world about yourself..."
+            value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
+            style={{ resize: 'vertical' }} />
+        </div>
+
+        <button className="btn btn-primary" style={{ width: '100%', marginBottom: 16 }} onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : saved ? '✓ Saved!' : 'Save Changes'}
+        </button>
+
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {[
+            { label: '🛡️ Request Verification Badge', action: () => navigate('/messages', { state: { toUser: 'famousworldsupport', message: 'Hi, I would like to request a verification badge for my account.' } }) },
+            { label: '❓ Help & Support', action: () => navigate('/messages', { state: { toUser: 'famousworldsupport' } }) },
+            { label: '📄 Terms & Conditions', action: () => navigate('/terms') },
+            { label: '🔒 Privacy Policy', action: () => navigate('/privacy') },
+          ].map(item => (
+            <button key={item.label} onClick={item.action} style={{
+              background: 'none', border: 'none', padding: '14px 0', textAlign: 'left',
+              fontSize: 14, color: 'var(--text-2)', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              {item.label}
+              <span style={{ color: 'var(--text-3)' }}>›</span>
+            </button>
+          ))}
+        </div>
+
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', marginTop: 24 }}>
+          Famous World v1.0 • Made with ❤️
+        </p>
       </div>
     </div>
   )

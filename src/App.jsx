@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { getCurrentUser } from './lib/auth'
 
-// Pages
 import AuthPage from './pages/AuthPage'
 import HomePage from './pages/HomePage'
 import SearchPage from './pages/SearchPage'
@@ -14,6 +13,8 @@ import LivePage from './pages/LivePage'
 import AdminPage from './pages/AdminPage'
 import UserProfilePage from './pages/UserProfilePage'
 import SettingsPage from './pages/SettingsPage'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
 import BottomNav from './components/BottomNav'
 
 export const UserContext = React.createContext(null)
@@ -23,12 +24,10 @@ function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Initialize Telegram WebApp
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready()
       window.Telegram.WebApp.expand()
     }
-
     const user = getCurrentUser()
     setCurrentUser(user)
     setLoading(false)
@@ -41,7 +40,7 @@ function App() {
           <div style={{ fontSize: 32, fontWeight: 800, background: 'linear-gradient(135deg, #E040FB, #FF6B9D)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', textAlign: 'center', marginBottom: 16 }}>
             Famous World
           </div>
-          <div className="spinner" style={{ margin: '0 auto' }}></div>
+          <div className="spinner" style={{ margin: '0 auto' }} />
         </div>
       </div>
     )
@@ -62,6 +61,8 @@ function App() {
             <Route path="/messages" element={currentUser ? <MessagesPage /> : <Navigate to="/auth" />} />
             <Route path="/live" element={currentUser ? <LivePage /> : <Navigate to="/auth" />} />
             <Route path="/settings" element={currentUser ? <SettingsPage /> : <Navigate to="/auth" />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/admin" element={currentUser?.is_admin ? <AdminPage /> : <Navigate to="/" />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
